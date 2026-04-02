@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>BuildCore PC Configuration</title>
+<style>
+body{font-family:'Segoe UI',Arial;margin:0;background:#0a0a0a;color:white;min-height:100vh;}
+header{text-align:center;padding:40px;font-size:3.5em;background:black;border-bottom:4px solid #ff0000;text-shadow: 0 0 20px #ff0000;font-weight:bold;letter-spacing:3px;}
+
+.video-section { text-align: center; padding: 25px; background: #111; border-bottom: 1px solid #333; }
+.video-btn {
+    display: inline-block; padding: 15px 40px; background: #ff0000; color: white;
+    text-decoration: none; font-weight: bold; border-radius: 5px; transition: 0.3s;
+    box-shadow: 0 0 15px rgba(255,0,0,0.3); border: 1px solid white;
+}
+.video-btn:hover { background: white; color: #ff0000; transform: translateY(-3px); }
+
+main{display:flex;flex-wrap:wrap;justify-content:center; padding: 40px; gap: 25px;}
+.card{
+    background:#151515; padding:20px; border-radius:12px; width:280px; 
+    text-align:center; border: 1px solid #222; transition: 0.4s;
+}
+.card:hover { border-color: #ff0000; transform: scale(1.03); box-shadow: 0 15px 30px rgba(255,0,0,0.15); }
+.card img { width: 100%; height: 220px; object-fit: cover; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }
+.price-tag { font-size: 1.8em; color: #00ff00; font-weight: bold; margin: 15px 0; }
+
+.modal {
+    display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #1a1a1a; padding: 30px; border-radius: 10px; border: 2px solid #ff0000; z-index: 1000; width: 340px;
+}
+.modal input { width: 92%; margin: 12px 0; padding: 12px; background: #222; color: white; border: 1px solid #444; border-radius: 5px; }
+#receipt { background: #fff; color: #000; font-family: 'Courier New', Courier, monospace; padding: 25px; border: 2px dashed #333; }
+
+#adminPanel{position:fixed;top:10px;left:10px;background:rgba(0,0,0,0.95);padding:20px;border-radius:10px;display:none; border: 2px solid #ff0000; z-index: 100; max-height: 80vh; overflow-y: auto; width: 280px;}
+#adminTrigger{position:fixed;bottom:5px;right:5px;width:40px;height:40px;opacity:0;}
+.order-item { background: #222; margin: 12px 0; padding: 15px; border-radius: 8px; border-left: 5px solid #00ff00; font-size: 0.9em; }
+.admin-btn-small { font-size: 11px; padding: 8px; margin: 3px; width: 45%; border:none; border-radius:4px; color:white; cursor:pointer; font-weight:bold;}
+</style>
+</head>
+<body>
+
+<header>BUILDCORE</header>
+
+<div class="video-section">
+    <p style="margin-bottom:15px; color:#aaa;">Guide de montage BuildCore</p>
+    <a href="https://youtube.com" target="_blank" class="video-btn">▶ VOIR LA VIDÉO DE MONTAGE</a>
+</div>
+
+<main id="products"></main>
+
+<!-- MODALS -->
+<div id="paymentModal" class="modal">
+    <h3>Paiement</h3>
+    <p id="payFor" style="color:red; font-weight:bold;"></p>
+    <input type="email" id="payEmail" placeholder="Ton Email" required>
+    <input type="text" placeholder="N° de Carte" maxlength="16">
+    <button onclick="confirmPayment()" style="background:#00ff00; color:black; width:100%; padding:15px; border:none; cursor:pointer; font-weight:bold;">PAYER</button>
+    <button onclick="closeModal('paymentModal')" style="background:none; color:gray; border:none; cursor:pointer; width:100%; margin-top:5px;">Annuler</button>
+</div>
+
+<div id="receiptModal" class="modal">
+    <div id="receipt">
+        <center><strong>BUILDCORE RECEIPT</strong></center><br>
+        <div id="receiptContent"></div>
+    </div>
+    <button onclick="closeModal('receiptModal')" style="background:black; color:white; width:100%; margin-top:20px; padding:10px; border:none; cursor:pointer;">OK</button>
+</div>
+
+<!-- PANEL ADMIN -->
+<div id="adminPanel">
+    <h3>PANEL GESTION</h3>
+    <button onclick="addProduct()" style="background:lime; color:black; width:100%; font-weight:bold; padding:10px; border:none; border-radius:5px; margin-bottom:10px; cursor:pointer;">➕ AJOUTER NOUVEAU PC</button>
+    <button onclick="resetStorage()" style="background:orange; color:white; width:100%; border:none; padding:5px; border-radius:5px; cursor:pointer;">Réinitialiser Tout</button>
+    <hr>
+    <div id="pendingList"></div>
+</div>
+
+<div id="adminTrigger"></div>
+
+<script>
+let isAdmin = false;
+let currentIdx = null;
+const codeAdmin = "12141214";
+
+// GENERATION INITIALE
+function generateInitial() {
+    let list = [];
+    for(let i=0; i<20; i++) {
+        let price = 10 + i;
+        list.push({
+            name: `BuildCore #${i+1}`,
+            price: `${price}$`,
+            img: `https://picsum.photos{price}/400/300`,
+            desc: `Fiche technique pour la config à ${price}$...`
+        });
+    }
+    return list;
+}
+
+let products = JSON.parse(localStorage.getItem('bc_v6_data')) || generateInitial();
+let orders = JSON.parse(localStorage.getItem('bc_v6_orders')) || [];
+
+function save() {
+    localStorage.setItem('bc_v6_data', JSON.stringify(products));
+    localStorage.setItem('bc_v6_orders', JSON.stringify(orders));
+    render();
+}
+
+function render() {
+    let html = "";
+    products.forEach((p, i) => {
+        html += `
+        <div class="card">
+            <img src="${p.img}">
+            <h3>${p.name}</h3>
+            <div class="price-tag">${p.price}</div>
+            ${isAdmin ? `
+                <button class="admin-btn-small" onclick="editName(${i})" style="background:#555;">Modifier Nom</button>
+                <button class="admin-btn-small" onclick="editPrice(${i})" style="background:#0055ff;">Modifier Prix</button>
+                <button class="admin-btn-small" onclick="editImg(${i})" style="background:#8800ff;">Modifier Image</button>
+                <button class="admin-btn-small" onclick="editMail(${i})" style="background:#ff8800;">Modifier Mail</button>
+                <button class="admin-btn-small" onclick="deleteProd(${i})" style="background:red; width:94%;">Supprimer</button>
+            ` : `<button onclick="openPayment(${i})" style="background:#ff0000; padding:12px; border:none; color:white; cursor:pointer; font-weight:bold; width:100%; border-radius:5px;">ACHETER CETTE CONFIG</button>`}
+        </div>`;
+    });
+    document.getElementById("products").innerHTML = html;
+    renderOrders();
+}
+
+// GESTION ADMIN
+function editName(i) {
+    let n = prompt("Nouveau nom pour ce PC :", products[i].name);
+    if(n) { products[i].name = n; save(); }
+}
+function editPrice(i) {
+    let p = prompt("Nouveau prix :", products[i].price);
+    if(p) { products[i].price = p; save(); }
+}
+function editImg(i) {
+    let img = prompt("URL de la nouvelle image :", products[i].img);
+    if(img) { products[i].img = img; save(); }
+}
+function editMail(i) {
+    let d = prompt("Description envoyée par mail :", products[i].desc);
+    if(d) { products[i].desc = d; save(); }
+}
+function addProduct() {
+    let n = prompt("Nom du PC ?");
+    let p = prompt("Prix ?");
+    if(n && p) { products.push({name:n, price:p, img:"https://picsum.photos", desc:"Détails..."}); save(); }
+}
+function deleteProd(i) { if(confirm("Supprimer?")) { products.splice(i,1); save(); } }
+function resetStorage() { if(confirm("Tout effacer?")) { localStorage.clear(); location.reload(); } }
+
+// CYCLE ACHAT
+function openPayment(i) {
+    currentIdx = i;
+    document.getElementById('payFor').innerText = products[i].name;
+    document.getElementById('paymentModal').style.display = 'block';
+}
+function confirmPayment() {
+    let email = document.getElementById('payEmail').value;
+    if(!email.includes("@")) return alert("Email requis");
+    orders.push({ pc: products[currentIdx], email: email, tid: "BC-"+Math.floor(Math.random()*1000) });
+    document.getElementById('receiptContent').innerHTML = `PC: ${products[currentIdx].name}<br>PRIX: ${products[currentIdx].price}<br>CLIENT: ${email}`;
+    closeModal('paymentModal');
+    document.getElementById('receiptModal').style.display = 'block';
+    save();
+}
+function renderOrders() {
+    if(!isAdmin) return;
+    let html = "";
+    orders.forEach((o, i) => {
+        html += `<div class="order-item"><strong>${o.pc.name}</strong><br>${o.email}<br><button onclick="sendMail(${i})" style="background:#00ff00; color:black; font-size:10px; border:none; padding:5px; width:100%; cursor:pointer;">VALIDER & ENVOYER MAIL</button></div>`;
+    });
+    document.getElementById('pendingList').innerHTML = html || "Aucune commande.";
+}
+function sendMail(i) {
+    let o = orders[i];
+    window.location.href = `mailto:${o.email}?subject=Ta Config ${o.pc.name}&body=${encodeURIComponent(o.pc.desc)}`;
+    orders.splice(i, 1);
+    save();
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+document.getElementById("adminTrigger").onclick = () => {
+    if(prompt("Code admin ?") === codeAdmin) {
+        isAdmin = true;
+        document.getElementById("adminPanel").style.display = "block";
+        render();
+    }
+};
+
+render();
+</script>
+</body>
+</html>
